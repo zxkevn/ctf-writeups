@@ -88,3 +88,72 @@ This is the code that deobfuscates the code block following the self-referential
 ```
 This is essentially a big NOP, and it appears throughout the code on multiple occasions.  I'm not sure why this code sequence appears so often; maybe it's intended to increase the workload of reversing.  In any case, it can be ignored.  The full source for the key generator is below.  Enjoy.
 
+```python
+# keygenme.py
+#!/usr/bin/python
+
+def transform(serial):
+    trans_matrix = [4, 2, 6, 4, -2, -5, 3, -6, -2, -4]
+    out = [int()] * 32
+    for i in range(len(serial)):
+        if ord(serial[i]) in range(0x30, 0x40):
+            out[i] = int(serial[i]) + trans_matrix[int(serial[i])]
+        else:
+            out[i] = serial[i]
+    return map(str, out)
+
+def generate_serial(username):
+    validchars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+
+    serial = [''] * 32
+    user_sum = 0
+    j = 0
+    n = -1
+    for i in range(len(username)):
+        user_sum = (user_sum + (i * (user_sum / (i+8) + i * ord(username[i]))))
+        j = (j + ord(username[i]))
+
+    if (user_sum < 1000):
+        user_sum *= user_sum
+
+    j ^= len(username)
+    j = ((15 * j + 1) / 16)
+    while (j >= 36):
+        j -= 7
+
+    for k in range(32):
+        if (not k or k % 7):
+            if (33 % (k+2)) and (k % 4):
+                t = ((user_sum / (35 - k)) + 1337)
+                t = (user_sum / t)
+                t = (t % (k + 1))
+                t = (((t * 15) + 1)  / ((j / 2) + 1))
+                if (n != -1) and (n == t):
+                    t = (t * 2)
+                while (t > 36):
+                    t = t - 2
+                while (t < 0):
+                    t = (t + 2)
+                n = t
+                serial[k] = validchars[t]
+            else:
+                u = (user_sum /(k + j) + 1337)
+                u = (user_sum / u)
+                u = (u ^ (k + 1))
+                u = ((u * 15 + 1) / (j / 2 + 1))
+                serial[k] = serial[k].upper()
+                if n != -1 and n == u:
+                    u = (u * 2)
+                while u >= 34:
+                    u -= 2
+                while u < 0:
+                    u = (u + 2)
+                n = u
+                serial[k] = validchars[u]
+        else:
+            serial[k] = '-'
+
+    return ''.join(transform(transform(serial)))
+
+print generate_serial('dropkick')
+```

