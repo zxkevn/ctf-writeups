@@ -12,4 +12,5 @@ A loose collection of some of the CTF solutions I've come up.  Quality of editin
 | [Bob's Hat](https://github.com/dropk1ck/ctf-writeups/blob/master/2016-03-17-bobs-hat.md) | Boston Key Party  | Breaking RSA in all ways possible |
 | [JIT In My Pants](https://github.com/dropk1ck/ctf-writeups/blob/master/2016-03-20-jit-in-my-pants.md) | Boston Key Party  | More reversing, but also while defeating side-channel protection measures |
 | [checker](https://github.com/dropk1ck/ctf-writeups/blob/master/2016-12-15-checker.md) | SECCON Quals| Using __stack_chk_fail() against itself |
+| [risky](https://github.com/dropk1ck/ctf-writeups/blob/master/hitcon-quals-2015-risky.md) | HITCON Quals| Reversing RISC-V binaries before it was cool |
 | [PostIt (Hardened)](https://github.com/dropk1ck/ctf-writeups/blob/master/pwnies-postit_hardened.md) | ???? | A CTF problem written by Pwnies and posted online for all to try. An incredibly weird dprintf() exploit that requires a ROP chain from hell. |
