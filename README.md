@@ -14,5 +14,5 @@ A loose collection of some of the CTF solutions I've come up.  Quality of editin
 | [checker](https://github.com/dropk1ck/ctf-writeups/blob/master/2016-12-15-checker.md) | SECCON Quals| Using __stack_chk_fail() against itself |
 | [risky](https://github.com/dropk1ck/ctf-writeups/blob/master/hitcon-quals-2015-risky.md) | HITCON Quals| Reversing RISC-V binaries before it was cool |
 | [PostIt (Hardened)](https://github.com/dropk1ck/ctf-writeups/blob/master/pwnies-postit_hardened.md) | ???? | A CTF problem written by Pwnies and posted online for all to try. An incredibly weird dprintf() exploit that requires a ROP chain from hell. |
-| [rope](https://gist.github.com/dropk1ck/7fa17e1996ebf43bd773634ce6f0b652) | HackTheBox | My Chrome exploit for the first portion of the HTB box 'rope' |
+| [rope](https://gist.github.com/dropk1ck/7fa17e1996ebf43bd773634ce6f0b652) | HackTheBox | My custom v8/Chrome exploit for the first portion of the HTB box 'rope' |
 | [keygenme](https://github.com/dropk1ck/ctf-writeups/blob/master/reddit-reversing-keygenmev7.md) | Reddit /REmath | Solution to a random RE/keygen challenge that was once posted to reddit /REmath subreddit |
